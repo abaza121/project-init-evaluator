@@ -70,7 +70,7 @@ Initialize a stable Rust CLI and library, then deliver the evaluator as narrow g
 
 ### Phase 4: Comparison and Hardening
 
-- [ ] Task 7: Add isolated baseline/candidate comparison
+- [x] Task 7: Add isolated baseline/candidate comparison
   - Acceptance: both packages are evaluated independently, outputs are partitioned, changes are calculated consistently, unavailable telemetry remains explicit, and no cross-project leakage occurs.
   - Verify: order-independence and package-isolation integration tests.
   - Files: `src/compare.rs`, `src/lib.rs`, `src/main.rs`, `tests/compare_cli.rs`, `CHANGELOG.md`.

@@ -13,6 +13,18 @@ cargo run -- evaluate `
 
 Optional inputs are accepted with `--project-model` and `--metadata`. The command writes `validation-report.json` and `validation-report.md` without modifying submitted artifacts.
 
+## Compare Baseline and Candidate
+
+```powershell
+cargo run -- compare `
+  --brief .\path\to\ORIGINAL_BRIEF.md `
+  --baseline .\path\to\baseline `
+  --candidate .\path\to\candidate `
+  --output .\comparison
+```
+
+The command evaluates both packages independently, writes their reports below `comparison\baseline` and `comparison\candidate`, and then writes `comparison-report.md`. Optional per-side models and metadata use the `--baseline-model`, `--candidate-model`, `--baseline-metadata`, and `--candidate-metadata` flags.
+
 ## Commands
 
 ```powershell

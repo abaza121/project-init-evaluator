@@ -63,11 +63,6 @@ pub enum EvaluatorError {
     },
     /// A package identifier was empty after trimming whitespace.
     EmptyPackageId,
-    /// A documented command mode has not reached its implementation milestone.
-    ModeUnavailable {
-        /// Command mode that is not yet available.
-        mode: &'static str,
-    },
 }
 
 impl Display for EvaluatorError {
@@ -110,9 +105,6 @@ impl Display for EvaluatorError {
                 write!(formatter, "package exceeds the {limit}-artifact limit")
             }
             Self::EmptyPackageId => write!(formatter, "package identifier cannot be empty"),
-            Self::ModeUnavailable { mode } => {
-                write!(formatter, "{mode} mode is not available yet")
-            }
         }
     }
 }

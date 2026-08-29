@@ -253,6 +253,14 @@ fn append_metrics(output: &mut String, metrics: &DeterministicMetrics) {
             "User Answer Adoption Rate",
             metrics.user_answer_adoption_rate,
         ),
+        ("Duplicate Question Rate", metrics.duplicate_question_rate),
+        ("Answer Reuse Rate", metrics.answer_reuse_rate),
+        (
+            "Retrieval Utilization Rate",
+            metrics.retrieval_utilization_rate,
+        ),
+        ("Repeated Research Rate", metrics.repeated_research_rate),
+        ("Stale Retrieval Rate", metrics.stale_retrieval_rate),
     ];
     for (label, value) in percentages {
         let rendered =
@@ -269,6 +277,32 @@ fn append_metrics(output: &mut String, metrics: &DeterministicMetrics) {
         "Unresolved High-Severity Findings",
         metrics.unresolved_high_severity_findings,
     );
+    append_optional_count(
+        output,
+        "Cross-Project Leakage",
+        metrics.cross_project_leakage,
+    );
+    append_optional_u64(output, "Context Supplied", metrics.context_supplied);
+    append_optional_u64(output, "Retrieval Calls", metrics.retrieval_calls);
+    append_optional_number(
+        output,
+        "Context Compression Ratio",
+        metrics.context_compression_ratio,
+    );
+    append_optional_number(
+        output,
+        "Execution Time (seconds)",
+        metrics.execution_time_seconds,
+    );
+    append_optional_number(
+        output,
+        "Human Interaction Time (seconds)",
+        metrics.human_interaction_time_seconds,
+    );
+    append_optional_u64(output, "User Questions", metrics.user_questions);
+    append_optional_u64(output, "Model Calls", metrics.model_calls);
+    append_optional_u64(output, "Token Usage", metrics.token_usage);
+    append_optional_number(output, "Cost", metrics.cost);
     let names = if metrics.conflicting_project_names.is_empty() {
         "None discovered".to_owned()
     } else {
@@ -280,6 +314,18 @@ fn append_metrics(output: &mut String, metrics: &DeterministicMetrics) {
 /// Appends one optional integer metric without inventing a value.
 fn append_optional_count(output: &mut String, label: &str, value: Option<usize>) {
     let rendered = value.map_or_else(|| "Unavailable".to_owned(), |value| value.to_string());
+    output.push_str(&format!("- {label}: {rendered}\n"));
+}
+
+/// Appends one optional 64-bit count without inventing a value.
+fn append_optional_u64(output: &mut String, label: &str, value: Option<u64>) {
+    let rendered = value.map_or_else(|| "Unavailable".to_owned(), |value| value.to_string());
+    output.push_str(&format!("- {label}: {rendered}\n"));
+}
+
+/// Appends one optional finite number without inventing a value or unit.
+fn append_optional_number(output: &mut String, label: &str, value: Option<f64>) {
+    let rendered = value.map_or_else(|| "Unavailable".to_owned(), |value| format!("{value:.1}"));
     output.push_str(&format!("- {label}: {rendered}\n"));
 }
 

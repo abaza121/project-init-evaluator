@@ -1,6 +1,7 @@
 //! Independent evaluation primitives for generated project-foundation packages.
 
 pub mod cli;
+pub mod compare;
 pub mod corpus;
 pub mod error;
 pub mod evaluate;
@@ -10,6 +11,9 @@ pub mod metrics;
 pub mod report;
 pub mod score;
 
+pub use compare::{
+    ComparisonInput, ComparisonResult, compare_packages, render_comparison_markdown,
+};
 pub use corpus::{Artifact, Corpus, CorpusLimits, collect_corpus};
 pub use error::EvaluatorError;
 pub use evaluate::{build_validation_report, evaluate_package, write_validation_reports};

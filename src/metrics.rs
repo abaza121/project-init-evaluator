@@ -32,6 +32,36 @@ pub struct DeterministicMetrics {
     pub unresolved_high_severity_finding_ids: Vec<String>,
     /// Percentage of identified user answers participating in an explicit trace.
     pub user_answer_adoption_rate: Option<f64>,
+    /// Percentage of shown questions whose answers materially already existed.
+    pub duplicate_question_rate: Option<f64>,
+    /// Percentage of resolvable candidate questions answered from existing knowledge.
+    pub answer_reuse_rate: Option<f64>,
+    /// Ratio of available semantic-project tokens to supplied context tokens.
+    pub context_compression_ratio: Option<f64>,
+    /// Percentage of retrieved records referenced by evaluator output.
+    pub retrieval_utilization_rate: Option<f64>,
+    /// Percentage of research operations duplicating existing usable evidence.
+    pub repeated_research_rate: Option<f64>,
+    /// Percentage of retrieved records that were stale or superseded.
+    pub stale_retrieval_rate: Option<f64>,
+    /// Number of records retrieved from a different project.
+    pub cross_project_leakage: Option<usize>,
+    /// Supplied context size reported by execution metadata.
+    pub context_supplied: Option<u64>,
+    /// Retrieval operation count reported by execution metadata.
+    pub retrieval_calls: Option<u64>,
+    /// Total execution time in seconds when supplied.
+    pub execution_time_seconds: Option<f64>,
+    /// Human interaction time in seconds when supplied.
+    pub human_interaction_time_seconds: Option<f64>,
+    /// Number of questions shown to the user when supplied.
+    pub user_questions: Option<u64>,
+    /// Number of model calls when supplied.
+    pub model_calls: Option<u64>,
+    /// Total token usage when supplied.
+    pub token_usage: Option<u64>,
+    /// Reported execution cost when supplied.
+    pub cost: Option<f64>,
 }
 
 /// Calculates deterministic metrics without using lexical similarity as arithmetic evidence.
@@ -47,6 +77,26 @@ pub fn calculate_metrics(corpus: &Corpus, extraction: &Extraction) -> Determinis
     let (unresolved_high_severity_findings, unresolved_high_severity_finding_ids) =
         unresolved_findings(corpus.metadata.as_ref());
     let user_answer_adoption_rate = user_answer_adoption_rate(extraction);
+    let duplicate_question_rate =
+        metadata_rate(corpus.metadata.as_ref(), "duplicate_question_rate");
+    let answer_reuse_rate = metadata_rate(corpus.metadata.as_ref(), "answer_reuse_rate");
+    let context_compression_ratio =
+        metadata_number(corpus.metadata.as_ref(), "context_compression_ratio");
+    let retrieval_utilization_rate =
+        metadata_rate(corpus.metadata.as_ref(), "retrieval_utilization_rate");
+    let repeated_research_rate = metadata_rate(corpus.metadata.as_ref(), "repeated_research_rate");
+    let stale_retrieval_rate = metadata_rate(corpus.metadata.as_ref(), "stale_retrieval_rate");
+    let cross_project_leakage = metadata_usize(corpus.metadata.as_ref(), "cross_project_leakage");
+    let context_supplied = metadata_u64(corpus.metadata.as_ref(), "context_supplied");
+    let retrieval_calls = metadata_u64(corpus.metadata.as_ref(), "retrieval_calls");
+    let execution_time_seconds =
+        metadata_number(corpus.metadata.as_ref(), "execution_time_seconds");
+    let human_interaction_time_seconds =
+        metadata_number(corpus.metadata.as_ref(), "human_interaction_time_seconds");
+    let user_questions = metadata_u64(corpus.metadata.as_ref(), "user_questions");
+    let model_calls = metadata_u64(corpus.metadata.as_ref(), "model_calls");
+    let token_usage = metadata_u64(corpus.metadata.as_ref(), "token_usage");
+    let cost = metadata_number(corpus.metadata.as_ref(), "cost");
 
     DeterministicMetrics {
         required_artifact_completion,
@@ -60,7 +110,44 @@ pub fn calculate_metrics(corpus: &Corpus, extraction: &Extraction) -> Determinis
         unresolved_high_severity_findings,
         unresolved_high_severity_finding_ids,
         user_answer_adoption_rate,
+        duplicate_question_rate,
+        answer_reuse_rate,
+        context_compression_ratio,
+        retrieval_utilization_rate,
+        repeated_research_rate,
+        stale_retrieval_rate,
+        cross_project_leakage,
+        context_supplied,
+        retrieval_calls,
+        execution_time_seconds,
+        human_interaction_time_seconds,
+        user_questions,
+        model_calls,
+        token_usage,
+        cost,
     }
+}
+
+/// Reads one submitted percentage without normalizing or inventing units.
+fn metadata_rate(metadata: Option<&Value>, key: &str) -> Option<f64> {
+    metadata_number(metadata, key).filter(|value| (0.0..=100.0).contains(value))
+}
+
+/// Reads one finite numeric metadata value from a schema-tolerant tree.
+fn metadata_number(metadata: Option<&Value>, key: &str) -> Option<f64> {
+    find_key(metadata?, key)?
+        .as_f64()
+        .filter(|value| value.is_finite())
+}
+
+/// Reads one unsigned integer metadata value.
+fn metadata_u64(metadata: Option<&Value>, key: &str) -> Option<u64> {
+    find_key(metadata?, key)?.as_u64()
+}
+
+/// Reads one platform-sized count only when it fits exactly.
+fn metadata_usize(metadata: Option<&Value>, key: &str) -> Option<usize> {
+    usize::try_from(metadata_u64(metadata, key)?).ok()
 }
 
 /// Calculates required-artifact completion from an explicit metadata manifest.

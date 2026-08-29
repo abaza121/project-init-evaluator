@@ -74,6 +74,15 @@ fn metrics_calculate_authoritative_rates_without_guessing() {
     ]);
     corpus.metadata = Some(json!({
         "required_artifacts": ["README.md", "Architecture.md"],
+        "duplicate_question_rate": 25.0,
+        "answer_reuse_rate": 75.0,
+        "repeated_research_rate": 10.0,
+        "stale_retrieval_rate": 5.0,
+        "context_supplied": 1200,
+        "retrieval_calls": 8,
+        "cross_project_leakage": 0,
+        "execution_time_seconds": 12.5,
+        "model_calls": 4,
         "findings": [
             {"id": "F-1", "severity": "HIGH", "resolved": false},
             {"id": "F-2", "severity": "LOW", "resolved": false}
@@ -92,6 +101,15 @@ fn metrics_calculate_authoritative_rates_without_guessing() {
     assert_eq!(metrics.unresolved_high_severity_findings, Some(1));
     assert_eq!(metrics.unresolved_high_severity_finding_ids, ["F-1"]);
     assert_eq!(metrics.user_answer_adoption_rate, Some(50.0));
+    assert_eq!(metrics.duplicate_question_rate, Some(25.0));
+    assert_eq!(metrics.answer_reuse_rate, Some(75.0));
+    assert_eq!(metrics.repeated_research_rate, Some(10.0));
+    assert_eq!(metrics.stale_retrieval_rate, Some(5.0));
+    assert_eq!(metrics.context_supplied, Some(1200));
+    assert_eq!(metrics.retrieval_calls, Some(8));
+    assert_eq!(metrics.cross_project_leakage, Some(0));
+    assert_eq!(metrics.execution_time_seconds, Some(12.5));
+    assert_eq!(metrics.model_calls, Some(4));
 }
 
 /// Proves metrics with no authoritative denominator remain unavailable rather than becoming zero.
