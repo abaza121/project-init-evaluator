@@ -52,7 +52,7 @@ Initialize a stable Rust CLI and library, then deliver the evaluator as narrow g
 
 ### Phase 3: Scoring and Reports
 
-- [ ] Task 5: Score the seven fixed rubric dimensions
+- [x] Task 5: Score the seven fixed rubric dimensions
   - Acceptance: dimension maxima are immutable; totals are normalized; findings are evidence-backed and complete; special failures are classified conservatively.
   - Verify: score boundary, no-evidence, contradiction, assumption-promotion, trace-theater, and invariant tests.
   - Files: `src/score.rs`, `src/report.rs`, `src/lib.rs`, `CHANGELOG.md`.

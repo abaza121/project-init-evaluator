@@ -12,3 +12,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add typed `evaluate` and `compare` command-line interfaces for project-foundation grading.
 - Add bounded, deterministic, read-only artifact collection with validated optional JSON inputs.
 - Add evidence-preserving entity extraction and authoritative deterministic quality metrics.
+- Add fixed-weight DRPFS scoring with evidence-backed findings and special failure classification.
