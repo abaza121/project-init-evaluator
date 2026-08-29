@@ -34,7 +34,7 @@ Initialize a stable Rust CLI and library, then deliver the evaluator as narrow g
 
 ### Phase 2: Read-Only Evaluation Pipeline
 
-- [ ] Task 3: Validate inputs and collect a bounded deterministic corpus
+- [x] Task 3: Validate inputs and collect a bounded deterministic corpus
   - Acceptance: valid text artifacts load in sorted order; missing/invalid paths, symlinks, unsupported files, and byte/file boundaries behave as specified; submitted files remain unchanged.
   - Verify: targeted corpus/input unit tests and full quality suite.
   - Files: `src/error.rs`, `src/input.rs`, `src/corpus.rs`, `src/lib.rs`, `CHANGELOG.md`.
