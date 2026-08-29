@@ -2,9 +2,16 @@
 
 `project-initiation-evaluator` is an independent, read-only grader for project-foundation packages. It implements the fixed Decision-Ready Project Foundation Score (DRPFS) rubric in [`init.md`](init.md) and is being delivered as verified incremental slices.
 
-## Status
+## Evaluate One Package
 
-The repository currently exposes the final command-line shape. Evaluation and report generation are added by the subsequent milestones in [`Docs/IMPLEMENTATION_PLAN.md`](Docs/IMPLEMENTATION_PLAN.md).
+```powershell
+cargo run -- evaluate `
+  --brief .\path\to\ORIGINAL_BRIEF.md `
+  --generated .\path\to\generated-project `
+  --output .\reports
+```
+
+Optional inputs are accepted with `--project-model` and `--metadata`. The command writes `validation-report.json` and `validation-report.md` without modifying submitted artifacts.
 
 ## Commands
 

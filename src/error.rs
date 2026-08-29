@@ -39,6 +39,11 @@ pub enum EvaluatorError {
         /// Parser diagnostic retained as evidence.
         source: serde_json::Error,
     },
+    /// A normalized report could not be serialized as JSON.
+    Serialization {
+        /// Serializer diagnostic.
+        source: serde_json::Error,
+    },
     /// One supported artifact exceeded its configured byte limit.
     ArtifactTooLarge {
         /// Artifact that exceeded the limit.
@@ -58,6 +63,11 @@ pub enum EvaluatorError {
     },
     /// A package identifier was empty after trimming whitespace.
     EmptyPackageId,
+    /// A documented command mode has not reached its implementation milestone.
+    ModeUnavailable {
+        /// Command mode that is not yet available.
+        mode: &'static str,
+    },
 }
 
 impl Display for EvaluatorError {
@@ -82,6 +92,9 @@ impl Display for EvaluatorError {
                     path.display()
                 )
             }
+            Self::Serialization { source } => {
+                write!(formatter, "report serialization failed: {source}")
+            }
             Self::ArtifactTooLarge { path, limit } => write!(
                 formatter,
                 "{} exceeds the {limit}-byte artifact limit",
@@ -97,6 +110,9 @@ impl Display for EvaluatorError {
                 write!(formatter, "package exceeds the {limit}-artifact limit")
             }
             Self::EmptyPackageId => write!(formatter, "package identifier cannot be empty"),
+            Self::ModeUnavailable { mode } => {
+                write!(formatter, "{mode} mode is not available yet")
+            }
         }
     }
 }
@@ -107,6 +123,7 @@ impl Error for EvaluatorError {
         match self {
             Self::Io { source, .. } => Some(source),
             Self::InvalidJson { source, .. } => Some(source),
+            Self::Serialization { source } => Some(source),
             _ => None,
         }
     }

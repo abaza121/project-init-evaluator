@@ -58,7 +58,7 @@ Initialize a stable Rust CLI and library, then deliver the evaluator as narrow g
   - Files: `src/score.rs`, `src/report.rs`, `src/lib.rs`, `CHANGELOG.md`.
   - Dependencies: Task 4.
 
-- [ ] Task 6: Render and atomically write JSON and Markdown reports
+- [x] Task 6: Render and atomically write JSON and Markdown reports
   - Acceptance: both formats contain consistent scores/metrics and all required sections; unsuccessful evaluation leaves no final report pair.
   - Verify: renderer snapshots/structural assertions and single-package integration test.
   - Files: `src/report.rs`, `src/lib.rs`, `tests/evaluate_cli.rs`, `CHANGELOG.md`.
@@ -66,7 +66,7 @@ Initialize a stable Rust CLI and library, then deliver the evaluator as narrow g
 
 ### Checkpoint: Single-Package Evaluation
 
-- [ ] A representative package produces schema-valid JSON and complete Markdown without modifying inputs.
+- [x] A representative package produces schema-valid JSON and complete Markdown without modifying inputs.
 
 ### Phase 4: Comparison and Hardening
 

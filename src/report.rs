@@ -50,6 +50,18 @@ impl Finding {
     }
 }
 
+impl Severity {
+    /// Returns the uppercase report label for this severity.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Low => "LOW",
+            Self::Medium => "MEDIUM",
+            Self::High => "HIGH",
+            Self::Critical => "CRITICAL",
+        }
+    }
+}
+
 /// Stores one bounded dimension score and all evidence-backed deductions.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct DimensionScore {
@@ -150,6 +162,181 @@ pub struct ValidationReport {
     pub unresolved_assumptions_and_questions: Vec<String>,
     /// Scope note for submitted external citations.
     pub external_verification_note: String,
+}
+
+/// Serializes one normalized validation report as stable pretty JSON.
+pub fn render_validation_json(report: &ValidationReport) -> Result<String, serde_json::Error> {
+    serde_json::to_string_pretty(report).map(|mut json| {
+        json.push('\n');
+        json
+    })
+}
+
+/// Renders every required validation-report Markdown section from one normalized model.
+pub fn render_validation_markdown(report: &ValidationReport) -> String {
+    let mut output = String::new();
+    output.push_str("# Validation Report\n\n## Overall Score\n\n");
+    output.push_str(&format!("DRPFS: {:.1} / 100\n\n", report.drpfs));
+    output.push_str("## Scorecard\n\n| Dimension | Score |\n|---|---:|\n");
+    append_score_rows(&mut output, &report.dimensions);
+    output.push_str(&format!("| TOTAL | {:.1}/100 |\n\n", report.drpfs));
+    output.push_str("## Deterministic Metrics\n\n");
+    append_metrics(&mut output, &report.metrics);
+    output.push_str("\n## Critical Findings\n\n");
+    append_filtered_findings(&mut output, &report.dimensions, true);
+    output.push_str("\n## Detailed Findings\n\n");
+    append_filtered_findings(&mut output, &report.dimensions, false);
+    output.push_str("\n## Unsupported Decisions\n\n");
+    append_list(&mut output, &report.unsupported_decisions);
+    output.push_str("\n## Unresolved Assumptions and Questions\n\n");
+    append_list(&mut output, &report.unresolved_assumptions_and_questions);
+    output.push_str("\n## Strengths\n\n");
+    append_list(&mut output, &report.strengths);
+    output.push_str("\n## Recommended Improvements\n\n");
+    append_numbered_list(&mut output, &report.highest_priority_improvements);
+    output.push_str("\n## External Verification Scope\n\n");
+    output.push_str(&report.external_verification_note);
+    output.push('\n');
+    output
+}
+
+/// Appends all seven scorecard rows in fixed rubric order.
+fn append_score_rows(output: &mut String, dimensions: &Dimensions) {
+    let rows = [
+        ("Brief Fidelity", &dimensions.brief_fidelity),
+        ("Assumption Discipline", &dimensions.assumption_discipline),
+        (
+            "Cross-Document Consistency",
+            &dimensions.cross_document_consistency,
+        ),
+        ("Evidence Quality", &dimensions.evidence_quality),
+        (
+            "Requirements → Decision Traceability",
+            &dimensions.traceability,
+        ),
+        ("Actionability", &dimensions.actionability),
+        ("Artifact Completeness", &dimensions.artifact_quality),
+    ];
+    for (label, dimension) in rows {
+        output.push_str(&format!(
+            "| {label} | {:.1}/{} |\n",
+            dimension.score, dimension.max
+        ));
+    }
+}
+
+/// Appends every deterministic metric with explicit unavailable values.
+fn append_metrics(output: &mut String, metrics: &DeterministicMetrics) {
+    let percentages = [
+        (
+            "Required Artifact Completion",
+            metrics.required_artifact_completion,
+        ),
+        (
+            "Acceptance Criteria Coverage",
+            metrics.acceptance_criteria_coverage,
+        ),
+        (
+            "Requirement Traceability Coverage",
+            metrics.requirement_traceability_coverage,
+        ),
+        (
+            "Unsupported Decision Rate",
+            metrics.unsupported_decision_rate,
+        ),
+        (
+            "High-Impact Assumption Labeling Rate",
+            metrics.high_impact_assumption_labeling_rate,
+        ),
+        ("Evidence Linkage Rate", metrics.evidence_linkage_rate),
+        (
+            "User Answer Adoption Rate",
+            metrics.user_answer_adoption_rate,
+        ),
+    ];
+    for (label, value) in percentages {
+        let rendered =
+            value.map_or_else(|| "Unavailable".to_owned(), |value| format!("{value:.1}%"));
+        output.push_str(&format!("- {label}: {rendered}\n"));
+    }
+    append_optional_count(
+        output,
+        "Broken Internal Links",
+        metrics.broken_internal_links,
+    );
+    append_optional_count(
+        output,
+        "Unresolved High-Severity Findings",
+        metrics.unresolved_high_severity_findings,
+    );
+    let names = if metrics.conflicting_project_names.is_empty() {
+        "None discovered".to_owned()
+    } else {
+        metrics.conflicting_project_names.join(", ")
+    };
+    output.push_str(&format!("- Conflicting Project Names: {names}\n"));
+}
+
+/// Appends one optional integer metric without inventing a value.
+fn append_optional_count(output: &mut String, label: &str, value: Option<usize>) {
+    let rendered = value.map_or_else(|| "Unavailable".to_owned(), |value| value.to_string());
+    output.push_str(&format!("- {label}: {rendered}\n"));
+}
+
+/// Appends either high-impact findings or all detailed findings.
+fn append_filtered_findings(output: &mut String, dimensions: &Dimensions, critical_only: bool) {
+    let findings = dimensions
+        .all_findings()
+        .into_iter()
+        .filter(|finding| {
+            !critical_only || matches!(finding.severity, Severity::High | Severity::Critical)
+        })
+        .collect::<Vec<_>>();
+    if findings.is_empty() {
+        output.push_str("- None.\n");
+        return;
+    }
+    for finding in findings {
+        output.push_str(&format!(
+            "### [{}] {}\n\n- Criterion: {}\n- Artifact: {}\n",
+            finding.severity.as_str(),
+            finding.description,
+            finding.criterion,
+            finding.artifact
+        ));
+        if let Some(identifier) = &finding.related_id {
+            output.push_str(&format!("- Related ID: {identifier}\n"));
+        }
+        if let Some(mode) = &finding.failure_mode {
+            output.push_str(&format!("- Failure mode: {mode}\n"));
+        }
+        output.push_str(&format!(
+            "- Evidence: {}\n- Recommended correction: {}\n\n",
+            finding.supporting_evidence, finding.recommended_correction
+        ));
+    }
+}
+
+/// Appends a Markdown bullet list or an explicit empty state.
+fn append_list(output: &mut String, values: &[String]) {
+    if values.is_empty() {
+        output.push_str("- None.\n");
+    } else {
+        for value in values {
+            output.push_str(&format!("- {value}\n"));
+        }
+    }
+}
+
+/// Appends a ranked Markdown list or an explicit empty state.
+fn append_numbered_list(output: &mut String, values: &[String]) {
+    if values.is_empty() {
+        output.push_str("1. None.\n");
+    } else {
+        for (index, value) in values.iter().enumerate() {
+            output.push_str(&format!("{}. {value}\n", index + 1));
+        }
+    }
 }
 
 /// Rounds a finite score to one decimal place.
