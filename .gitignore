@@ -1,0 +1,6 @@
+/target/
+/.env
+/.env.*
+*.tmp
+*.swp
+.idea/

@@ -22,7 +22,7 @@ Initialize a stable Rust CLI and library, then deliver the evaluator as narrow g
   - Files: `init.md`, `AGENTS.md`, `Docs/CHANGELOG_GUIDELINES.md`, `Docs/SPECIFICATION.md`, `Docs/IMPLEMENTATION_PLAN.md`.
   - Dependencies: none.
 
-- [ ] Task 2: Initialize a buildable crate and documented CLI shell
+- [x] Task 2: Initialize a buildable crate and documented CLI shell
   - Acceptance: Cargo metadata, library/binary entry points, README, `.gitignore`, and `CHANGELOG.md` exist; `--help` exposes `evaluate` and `compare` without implementing evaluation.
   - Verify: `cargo fmt --check`, `cargo check`, `cargo test`, and CLI help.
   - Files: `Cargo.toml`, `Cargo.lock`, `.gitignore`, `src/lib.rs`, `src/main.rs`, `README.md`, `CHANGELOG.md`.
@@ -30,7 +30,7 @@ Initialize a stable Rust CLI and library, then deliver the evaluator as narrow g
 
 ### Checkpoint: Foundation
 
-- [ ] The repository builds cleanly and its public contract is documented.
+- [x] The repository builds cleanly and its public contract is documented.
 
 ### Phase 2: Read-Only Evaluation Pipeline
 
