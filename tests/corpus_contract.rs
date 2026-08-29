@@ -210,3 +210,35 @@ fn corpus_enforces_exact_discovered_entry_boundary() -> Result<(), Box<dyn Error
     assert!(matches!(error, EvaluatorError::TooManyEntries { .. }));
     Ok(())
 }
+
+/// Proves a realistically sized interleaved corpus remains complete and deterministically ordered.
+#[test]
+fn corpus_collects_1024_partitioned_artifacts_stably() -> Result<(), Box<dyn Error>> {
+    let workspace = TestWorkspace::new()?;
+    let input = workspace.input()?;
+    for index in 0..1_024 {
+        workspace.write(
+            format!("generated/partition-{}/req-{index:04}.md", index % 8),
+            &format!("REQ-{index:04}: Preserve requirement {index}."),
+        )?;
+    }
+
+    let corpus = collect_corpus(&input, CorpusLimits::default())?;
+    let paths = corpus
+        .artifacts
+        .iter()
+        .map(|artifact| artifact.relative_path.clone())
+        .collect::<Vec<_>>();
+    let mut sorted_paths = paths.clone();
+    sorted_paths.sort();
+    let hashes = corpus
+        .artifacts
+        .iter()
+        .map(|artifact| artifact.content_hash.clone())
+        .collect::<std::collections::BTreeSet<_>>();
+
+    assert_eq!(paths, sorted_paths);
+    assert_eq!(paths.len(), 1_024);
+    assert_eq!(hashes.len(), 1_024);
+    Ok(())
+}
