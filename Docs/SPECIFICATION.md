@@ -100,6 +100,7 @@ For a C# developer, the crate is comparable to a project/assembly. Public Rust m
 - `metrics`: authoritative deterministic metric calculations.
 - `score`: seven dimension evaluators and invariant normalization.
 - `report`: JSON schema types and Markdown rendering.
+- `evaluate`: isolated single-package orchestration and transactional report-pair writing.
 - `compare`: independent two-package orchestration and comparison rendering.
 
 The library exposes request and report types plus `evaluate` and `compare`. The binary is a thin adapter that parses arguments, calls the library, and returns a non-zero exit code with a concise diagnostic on failure.
@@ -119,7 +120,7 @@ The library exposes request and report types plus `evaluate` and `compare`. The 
 ## Error Handling and Limits
 
 - Missing paths, non-directory package roots, malformed supplied JSON, unreadable UTF-8, unsafe output overlap, and limit exhaustion return typed errors with path context.
-- Default limits: 2 MiB per artifact, 32 MiB per package, and 10,000 artifacts. Exact-boundary tests cover accepted and rejected neighbors.
+- Default limits: 2 MiB per input file, 32 MiB per package, 10,000 supported artifacts, and 20,000 discovered files/directories/symlinks. Exact-boundary tests cover accepted and rejected neighbors.
 - Symlinks are not followed, preventing traversal outside the submitted directory and cycles.
 - Reports are rendered in memory and written only after evaluation succeeds. Each target file is written through a sibling temporary file and renamed to reduce partial-output risk.
 
@@ -168,9 +169,8 @@ Lint:   cargo clippy --all-targets --all-features -- -D warnings
 
 ```text
 src/                 library modules and thin binary
-tests/               CLI and end-to-end black-box tests
+tests/               unit-contract, CLI, scale, and end-to-end black-box tests
 Docs/                specification, plan, and changelog guidance
-fixtures/            compact deterministic evaluation packages
 init.md              authoritative evaluator brief
 CHANGELOG.md          Keep a Changelog unreleased history
 ```

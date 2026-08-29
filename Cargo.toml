@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2024"
 publish = false
 description = "Independent evaluator for generated project-foundation packages"
-license = "MIT"
 
 [dependencies]
 clap = { version = "4.6.0", features = ["derive"] }

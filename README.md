@@ -35,3 +35,12 @@ cargo clippy --all-targets --all-features -- -D warnings
 ```
 
 The complete behavior contract and design rationale are in [`Docs/SPECIFICATION.md`](Docs/SPECIFICATION.md).
+
+## Evaluation Boundaries
+
+- Supported generated artifacts are UTF-8 Markdown, text, JSON, TOML, and YAML files.
+- Default limits are 10,000 supported artifacts, 20,000 discovered entries, 2 MiB per input file, and 32 MiB for the collected package.
+- Symlinks are recorded as skipped and never followed.
+- Deterministic token overlap discovers coverage and plausibility candidates; it does not provide language-model semantic equivalence and can miss low-vocabulary paraphrases.
+- External citation correctness is not independently verified. Reports assess submitted citation identity and decision linkage and state this scope explicitly.
+- LanceDB and external model APIs are not required. A future semantic retrieval adapter can be added without changing deterministic metric arithmetic.

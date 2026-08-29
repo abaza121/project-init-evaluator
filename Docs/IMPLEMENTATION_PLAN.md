@@ -76,7 +76,7 @@ Initialize a stable Rust CLI and library, then deliver the evaluator as narrow g
   - Files: `src/compare.rs`, `src/lib.rs`, `src/main.rs`, `tests/compare_cli.rs`, `CHANGELOG.md`.
   - Dependencies: Task 6.
 
-- [ ] Task 8: Complete documentation, adversarial verification, and review fixes
+- [x] Task 8: Complete documentation, adversarial verification, and review fixes
   - Acceptance: README examples run; all public/private/test items meet commenting rules; the full suite and realistic-scale checks pass; review findings are resolved or explicitly deferred.
   - Verify: formatting, check, all tests, Clippy with warnings denied, help smoke tests, Git diff/history review.
   - Files: `README.md`, test fixtures, and narrowly required review fixes.
@@ -84,9 +84,9 @@ Initialize a stable Rust CLI and library, then deliver the evaluator as narrow g
 
 ### Checkpoint: Complete
 
-- [ ] All acceptance criteria in `Docs/SPECIFICATION.md` are met.
-- [ ] Every notable behavior is represented once under `CHANGELOG.md` → `Unreleased`.
-- [ ] Each commit is atomic, green, and free of secrets/build output.
+- [x] All acceptance criteria in `Docs/SPECIFICATION.md` are met.
+- [x] Every notable behavior is represented once under `CHANGELOG.md` → `Unreleased`.
+- [x] Each commit is atomic, green, and free of secrets/build output.
 
 ## Risks and Mitigations
 
