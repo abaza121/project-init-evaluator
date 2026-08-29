@@ -40,7 +40,7 @@ Initialize a stable Rust CLI and library, then deliver the evaluator as narrow g
   - Files: `src/error.rs`, `src/input.rs`, `src/corpus.rs`, `src/lib.rs`, `CHANGELOG.md`.
   - Dependencies: Task 2.
 
-- [ ] Task 4: Extract evaluator-owned entities and authoritative metrics
+- [x] Task 4: Extract evaluator-owned entities and authoritative metrics
   - Acceptance: requirements, decisions, assumptions, evidence, questions, IDs, links, and traces retain file/line evidence; all calculable metrics use authoritative records and unavailable values remain null.
   - Verify: extraction/metric adversarial unit tests including malformed metadata, duplicate IDs, and broken links.
   - Files: `src/extract.rs`, `src/metrics.rs`, `src/input.rs`, `src/lib.rs`, `CHANGELOG.md`.
@@ -48,7 +48,7 @@ Initialize a stable Rust CLI and library, then deliver the evaluator as narrow g
 
 ### Checkpoint: Deterministic Core
 
-- [ ] Corpus and metrics tests pass at exact boundaries and after rejected input.
+- [x] Corpus and metrics tests pass at exact boundaries and after rejected input.
 
 ### Phase 3: Scoring and Reports
 
