@@ -11,6 +11,8 @@ use crate::input::PackageInput;
 pub struct CorpusLimits {
     /// Maximum supported generated artifacts.
     pub max_artifacts: usize,
+    /// Maximum files, directories, and symlinks visited during discovery.
+    pub max_discovered_entries: usize,
     /// Maximum UTF-8 bytes in any brief, artifact, model, or metadata file.
     pub max_artifact_bytes: usize,
     /// Maximum combined UTF-8 bytes across all collected inputs.
@@ -22,6 +24,7 @@ impl Default for CorpusLimits {
     fn default() -> Self {
         Self {
             max_artifacts: 10_000,
+            max_discovered_entries: 20_000,
             max_artifact_bytes: 2 * 1024 * 1024,
             max_total_bytes: 32 * 1024 * 1024,
         }
@@ -199,21 +202,14 @@ fn read_optional_json(
         })
 }
 
-/// Collects supported generated files recursively without following symlinks.
+/// Collects supported generated files without following symlinks.
 fn collect_generated(
     root: &Path,
     limits: CorpusLimits,
     total_bytes: &mut usize,
 ) -> Result<(Vec<Artifact>, Vec<PathBuf>), EvaluatorError> {
-    let mut files = Vec::new();
-    let mut skipped = Vec::new();
-    discover_files(root, root, &mut files, &mut skipped)?;
+    let (mut files, skipped) = discover_files(root, limits)?;
     files.sort();
-    if files.len() > limits.max_artifacts {
-        return Err(EvaluatorError::TooManyArtifacts {
-            limit: limits.max_artifacts,
-        });
-    }
 
     let mut artifacts = Vec::with_capacity(files.len());
     for path in files {
@@ -223,13 +219,55 @@ fn collect_generated(
     Ok((artifacts, skipped))
 }
 
-/// Discovers supported regular files and records all skipped file-like entries.
+/// Discovers regular files with an explicit directory stack and bounded retained state.
 fn discover_files(
     root: &Path,
-    directory: &Path,
-    files: &mut Vec<PathBuf>,
-    skipped: &mut Vec<PathBuf>,
-) -> Result<(), EvaluatorError> {
+    limits: CorpusLimits,
+) -> Result<(Vec<PathBuf>, Vec<PathBuf>), EvaluatorError> {
+    let mut directories = vec![root.to_path_buf()];
+    let mut files = Vec::new();
+    let mut skipped = Vec::new();
+    let mut discovered = 0usize;
+    while let Some(directory) = directories.pop() {
+        let mut entries = read_sorted_directory(&directory)?;
+        for entry in entries.drain(..) {
+            discovered = discovered
+                .checked_add(1)
+                .ok_or(EvaluatorError::TooManyEntries {
+                    limit: limits.max_discovered_entries,
+                })?;
+            if discovered > limits.max_discovered_entries {
+                return Err(EvaluatorError::TooManyEntries {
+                    limit: limits.max_discovered_entries,
+                });
+            }
+            let path = entry.path();
+            let relative = path.strip_prefix(root).unwrap_or(&path).to_path_buf();
+            let file_type = entry.file_type().map_err(|source| EvaluatorError::Io {
+                path: path.clone(),
+                source,
+            })?;
+            if file_type.is_symlink() {
+                skipped.push(relative);
+            } else if file_type.is_dir() {
+                directories.push(path);
+            } else if file_type.is_file() && is_supported(&path) {
+                files.push(path);
+                if files.len() > limits.max_artifacts {
+                    return Err(EvaluatorError::TooManyArtifacts {
+                        limit: limits.max_artifacts,
+                    });
+                }
+            } else {
+                skipped.push(relative);
+            }
+        }
+    }
+    Ok((files, skipped))
+}
+
+/// Reads one directory into deterministic file-name order with path-aware errors.
+fn read_sorted_directory(directory: &Path) -> Result<Vec<fs::DirEntry>, EvaluatorError> {
     let mut entries = fs::read_dir(directory)
         .map_err(|source| EvaluatorError::Io {
             path: directory.to_path_buf(),
@@ -241,25 +279,7 @@ fn discover_files(
             source,
         })?;
     entries.sort_by_key(|entry| entry.file_name());
-
-    for entry in entries {
-        let path = entry.path();
-        let relative = path.strip_prefix(root).unwrap_or(&path).to_path_buf();
-        let file_type = entry.file_type().map_err(|source| EvaluatorError::Io {
-            path: path.clone(),
-            source,
-        })?;
-        if file_type.is_symlink() {
-            skipped.push(relative);
-        } else if file_type.is_dir() {
-            discover_files(root, &path, files, skipped)?;
-        } else if file_type.is_file() && is_supported(&path) {
-            files.push(path);
-        } else {
-            skipped.push(relative);
-        }
-    }
-    Ok(())
+    Ok(entries)
 }
 
 /// Recognizes textual project-artifact extensions supported by the evaluator.
@@ -282,6 +302,23 @@ fn read_artifact(
     limits: CorpusLimits,
     total_bytes: &mut usize,
 ) -> Result<Artifact, EvaluatorError> {
+    let metadata = fs::metadata(path).map_err(|source| EvaluatorError::Io {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    let declared_len = usize::try_from(metadata.len()).unwrap_or(usize::MAX);
+    if declared_len > limits.max_artifact_bytes {
+        return Err(EvaluatorError::ArtifactTooLarge {
+            path: path.to_path_buf(),
+            limit: limits.max_artifact_bytes,
+        });
+    }
+    total_bytes
+        .checked_add(declared_len)
+        .filter(|total| *total <= limits.max_total_bytes)
+        .ok_or(EvaluatorError::PackageTooLarge {
+            limit: limits.max_total_bytes,
+        })?;
     let bytes = fs::read(path).map_err(|source| EvaluatorError::Io {
         path: path.to_path_buf(),
         source,

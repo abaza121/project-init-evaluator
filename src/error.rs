@@ -61,6 +61,11 @@ pub enum EvaluatorError {
         /// Configured inclusive artifact-count limit.
         limit: usize,
     },
+    /// Directory traversal encountered more entries than configured.
+    TooManyEntries {
+        /// Configured inclusive discovered-entry limit.
+        limit: usize,
+    },
     /// A package identifier was empty after trimming whitespace.
     EmptyPackageId,
 }
@@ -103,6 +108,12 @@ impl Display for EvaluatorError {
             }
             Self::TooManyArtifacts { limit } => {
                 write!(formatter, "package exceeds the {limit}-artifact limit")
+            }
+            Self::TooManyEntries { limit } => {
+                write!(
+                    formatter,
+                    "package exceeds the {limit}-entry discovery limit"
+                )
             }
             Self::EmptyPackageId => write!(formatter, "package identifier cannot be empty"),
         }

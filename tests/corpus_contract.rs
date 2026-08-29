@@ -191,3 +191,22 @@ fn corpus_rejects_missing_brief_without_partial_output() -> Result<(), Box<dyn E
     assert!(!input.output_dir.exists());
     Ok(())
 }
+
+/// Proves skipped files and directories remain bounded at the exact discovered-entry limit.
+#[test]
+fn corpus_enforces_exact_discovered_entry_boundary() -> Result<(), Box<dyn Error>> {
+    let workspace = TestWorkspace::new()?;
+    let input = workspace.input()?;
+    workspace.write("generated/one.bin", "one")?;
+    workspace.write("generated/two.bin", "two")?;
+    let limits = CorpusLimits {
+        max_discovered_entries: 2,
+        ..CorpusLimits::default()
+    };
+
+    assert_eq!(collect_corpus(&input, limits)?.skipped_files.len(), 2);
+    workspace.write("generated/three.bin", "three")?;
+    let error = collect_corpus(&input, limits).unwrap_err();
+    assert!(matches!(error, EvaluatorError::TooManyEntries { .. }));
+    Ok(())
+}
