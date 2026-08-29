@@ -173,3 +173,46 @@ fn extraction_imports_identified_project_model_records() {
             .any(|trace| trace.from_id == "ADR-010" && trace.to_id == "REQ-010")
     );
 }
+
+/// Proves unidentified decisions remain in unsupported and research-dependent denominators.
+#[test]
+fn metrics_count_unidentified_decisions_conservatively() {
+    let corpus = corpus(vec![artifact(
+        "Decisions.md",
+        "# Decisions\n- Market research selects PostgreSQL persistence.",
+    )]);
+    let extraction = extract_entities(&corpus);
+    let metrics = calculate_metrics(&corpus, &extraction);
+
+    assert_eq!(metrics.unsupported_decision_rate, Some(100.0));
+    assert_eq!(metrics.evidence_linkage_rate, Some(0.0));
+}
+
+/// Proves experimental rates are calculated when authoritative counts are supplied.
+#[test]
+fn metrics_calculate_experimental_rates_from_supplied_counts() {
+    let mut corpus = corpus(Vec::new());
+    corpus.metadata = Some(json!({
+        "duplicate_questions": 1,
+        "questions_shown": 4,
+        "candidate_questions_resolved_using_existing_project_knowledge": 3,
+        "candidate_questions_with_sufficient_existing_answers": 4,
+        "retrieved_records_used": 7,
+        "retrieved_records": 10,
+        "research_operations_substantially_duplicating_existing_usable_evidence": 1,
+        "research_operations": 5,
+        "stale_or_superseded_records_returned": 2,
+        "total_available_semantic_project_tokens": 1000,
+        "tokens_supplied_as_retrieved_context": 200
+    }));
+
+    let extraction = extract_entities(&corpus);
+    let metrics = calculate_metrics(&corpus, &extraction);
+
+    assert_eq!(metrics.duplicate_question_rate, Some(25.0));
+    assert_eq!(metrics.answer_reuse_rate, Some(75.0));
+    assert_eq!(metrics.retrieval_utilization_rate, Some(70.0));
+    assert_eq!(metrics.repeated_research_rate, Some(20.0));
+    assert_eq!(metrics.stale_retrieval_rate, Some(20.0));
+    assert_eq!(metrics.context_compression_ratio, Some(5.0));
+}

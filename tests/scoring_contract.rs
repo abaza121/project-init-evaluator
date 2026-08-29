@@ -109,3 +109,55 @@ fn scoring_classifies_multiple_special_failure_modes() {
     assert!(modes.contains(&"UserOverrideFailure"));
     assert!(modes.contains(&"UnderSpecification"));
 }
+
+/// Proves submitted research that influences no decision is classified as decorative.
+#[test]
+fn scoring_flags_decorative_research_without_research_decisions() {
+    let corpus = corpus(
+        "REQ-001: The product must work offline.",
+        vec![artifact(
+            "Foundation.md",
+            "# Requirements\nREQ-001: The product works offline.\n# Evidence\nEVD-001: An unrelated market overview.",
+        )],
+    );
+    let extraction = extract_entities(&corpus);
+    let metrics = calculate_metrics(&corpus, &extraction);
+
+    let report = score_corpus(&corpus, &extraction, metrics);
+
+    assert!(report.dimensions.evidence_quality.score < 15.0);
+    assert!(
+        report
+            .dimensions
+            .evidence_quality
+            .findings
+            .iter()
+            .any(|finding| finding.failure_mode.as_deref() == Some("DecorativeResearch"))
+    );
+}
+
+/// Proves unidentified high-impact decisions remain visible as unsupported assumptions.
+#[test]
+fn scoring_reports_unidentified_unsupported_decisions() {
+    let corpus = corpus(
+        "REQ-001: The product must work offline.",
+        vec![artifact(
+            "Foundation.md",
+            "# Decisions\n- Use PostgreSQL persistence.",
+        )],
+    );
+    let extraction = extract_entities(&corpus);
+    let metrics = calculate_metrics(&corpus, &extraction);
+
+    let report = score_corpus(&corpus, &extraction, metrics);
+
+    assert_eq!(report.unsupported_decisions.len(), 1);
+    assert!(
+        report
+            .dimensions
+            .assumption_discipline
+            .findings
+            .iter()
+            .any(|finding| finding.failure_mode.as_deref() == Some("AssumptionPromotion"))
+    );
+}

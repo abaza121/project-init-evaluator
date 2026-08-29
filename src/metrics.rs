@@ -77,15 +77,44 @@ pub fn calculate_metrics(corpus: &Corpus, extraction: &Extraction) -> Determinis
     let (unresolved_high_severity_findings, unresolved_high_severity_finding_ids) =
         unresolved_findings(corpus.metadata.as_ref());
     let user_answer_adoption_rate = user_answer_adoption_rate(extraction);
-    let duplicate_question_rate =
-        metadata_rate(corpus.metadata.as_ref(), "duplicate_question_rate");
-    let answer_reuse_rate = metadata_rate(corpus.metadata.as_ref(), "answer_reuse_rate");
+    let duplicate_question_rate = metadata_rate_or_fraction(
+        corpus.metadata.as_ref(),
+        "duplicate_question_rate",
+        "duplicate_questions",
+        "questions_shown",
+    );
+    let answer_reuse_rate = metadata_rate_or_fraction(
+        corpus.metadata.as_ref(),
+        "answer_reuse_rate",
+        "candidate_questions_resolved_using_existing_project_knowledge",
+        "candidate_questions_with_sufficient_existing_answers",
+    );
     let context_compression_ratio =
-        metadata_number(corpus.metadata.as_ref(), "context_compression_ratio");
-    let retrieval_utilization_rate =
-        metadata_rate(corpus.metadata.as_ref(), "retrieval_utilization_rate");
-    let repeated_research_rate = metadata_rate(corpus.metadata.as_ref(), "repeated_research_rate");
-    let stale_retrieval_rate = metadata_rate(corpus.metadata.as_ref(), "stale_retrieval_rate");
+        metadata_number(corpus.metadata.as_ref(), "context_compression_ratio").or_else(|| {
+            metadata_ratio(
+                corpus.metadata.as_ref(),
+                "total_available_semantic_project_tokens",
+                "tokens_supplied_as_retrieved_context",
+            )
+        });
+    let retrieval_utilization_rate = metadata_rate_or_fraction(
+        corpus.metadata.as_ref(),
+        "retrieval_utilization_rate",
+        "retrieved_records_used",
+        "retrieved_records",
+    );
+    let repeated_research_rate = metadata_rate_or_fraction(
+        corpus.metadata.as_ref(),
+        "repeated_research_rate",
+        "research_operations_substantially_duplicating_existing_usable_evidence",
+        "research_operations",
+    );
+    let stale_retrieval_rate = metadata_rate_or_fraction(
+        corpus.metadata.as_ref(),
+        "stale_retrieval_rate",
+        "stale_or_superseded_records_returned",
+        "retrieved_records",
+    );
     let cross_project_leakage = metadata_usize(corpus.metadata.as_ref(), "cross_project_leakage");
     let context_supplied = metadata_u64(corpus.metadata.as_ref(), "context_supplied");
     let retrieval_calls = metadata_u64(corpus.metadata.as_ref(), "retrieval_calls");
@@ -131,6 +160,31 @@ pub fn calculate_metrics(corpus: &Corpus, extraction: &Extraction) -> Determinis
 /// Reads one submitted percentage without normalizing or inventing units.
 fn metadata_rate(metadata: Option<&Value>, key: &str) -> Option<f64> {
     metadata_number(metadata, key).filter(|value| (0.0..=100.0).contains(value))
+}
+
+/// Uses a submitted rate when present or calculates it from authoritative counts.
+fn metadata_rate_or_fraction(
+    metadata: Option<&Value>,
+    rate_key: &str,
+    numerator_key: &str,
+    denominator_key: &str,
+) -> Option<f64> {
+    metadata_rate(metadata, rate_key).or_else(|| {
+        let numerator = usize::try_from(metadata_u64(metadata, numerator_key)?).ok()?;
+        let denominator = usize::try_from(metadata_u64(metadata, denominator_key)?).ok()?;
+        percentage(numerator, denominator)
+    })
+}
+
+/// Calculates one finite plain ratio from two authoritative numeric counts.
+fn metadata_ratio(
+    metadata: Option<&Value>,
+    numerator_key: &str,
+    denominator_key: &str,
+) -> Option<f64> {
+    let numerator = metadata_number(metadata, numerator_key)?;
+    let denominator = metadata_number(metadata, denominator_key)?;
+    (denominator > 0.0).then(|| ((numerator / denominator) * 10.0).round() / 10.0)
 }
 
 /// Reads one finite numeric metadata value from a schema-tolerant tree.
@@ -215,34 +269,33 @@ fn requirement_traceability_coverage(extraction: &Extraction) -> Option<f64> {
 
 /// Calculates the share of identified decisions with no explicit provenance endpoint.
 fn unsupported_decision_rate(extraction: &Extraction) -> Option<f64> {
-    let decisions = entities_by_id(extraction, EntityKind::Decision);
+    let decisions = decision_groups(extraction);
     if decisions.is_empty() {
         return None;
     }
     let unsupported = decisions
         .iter()
-        .filter(|(identifier, entities)| {
+        .filter(|(_, entities)| {
             !entities
                 .iter()
-                .any(|entity| entity_has_valid_provenance(entity, extraction, identifier))
+                .any(|entity| entity_has_valid_provenance(entity, extraction))
         })
         .count();
     percentage(unsupported, decisions.len())
 }
 
 /// Determines whether a decision has a valid explicit source, requirement, answer, or assumption.
-fn entity_has_valid_provenance(
-    entity: &ExtractedEntity,
-    extraction: &Extraction,
-    identifier: &str,
-) -> bool {
-    entity
-        .related_ids
-        .iter()
-        .any(|related| is_provenance_identifier(related))
-        || extraction.traces.iter().any(|trace| {
-            (trace.from_id == identifier && is_provenance_identifier(&trace.to_id))
-                || (trace.to_id == identifier && is_provenance_identifier(&trace.from_id))
+fn entity_has_valid_provenance(entity: &ExtractedEntity, extraction: &Extraction) -> bool {
+    entity.evidence.artifact == "ORIGINAL_BRIEF"
+        || entity
+            .related_ids
+            .iter()
+            .any(|related| is_provenance_identifier(related))
+        || entity.id.as_ref().is_some_and(|identifier| {
+            extraction.traces.iter().any(|trace| {
+                (trace.from_id == *identifier && is_provenance_identifier(&trace.to_id))
+                    || (trace.to_id == *identifier && is_provenance_identifier(&trace.from_id))
+            })
         })
 }
 
@@ -325,7 +378,7 @@ fn concept_is_present_in_brief(text: &str, brief: &str) -> bool {
 
 /// Calculates explicit evidence linkage for decisions whose text claims research dependence.
 fn evidence_linkage_rate(extraction: &Extraction) -> Option<f64> {
-    let decisions = entities_by_id(extraction, EntityKind::Decision);
+    let decisions = decision_groups(extraction);
     let research_dependent = decisions
         .iter()
         .filter(|(_, entities)| entities.iter().any(|entity| research_dependent(entity)))
@@ -335,13 +388,16 @@ fn evidence_linkage_rate(extraction: &Extraction) -> Option<f64> {
     }
     let linked = research_dependent
         .iter()
-        .filter(|(identifier, entities)| {
+        .filter(|(_, entities)| {
             entities.iter().any(|entity| {
                 entity
                     .related_ids
                     .iter()
                     .any(|related| is_evidence_identifier(related))
-                    || trace_links_evidence(extraction, identifier)
+                    || entity
+                        .id
+                        .as_ref()
+                        .is_some_and(|identifier| trace_links_evidence(extraction, identifier))
             })
         })
         .count();
@@ -563,20 +619,19 @@ fn ids_of_kind(extraction: &Extraction, kind: EntityKind) -> BTreeSet<String> {
         .collect()
 }
 
-/// Groups identified entities by stable ID for denominator-safe calculations.
-fn entities_by_id(
-    extraction: &Extraction,
-    kind: EntityKind,
-) -> BTreeMap<String, Vec<&ExtractedEntity>> {
+/// Groups decisions by submitted ID or a stable evidence location when unidentified.
+fn decision_groups(extraction: &Extraction) -> BTreeMap<String, Vec<&ExtractedEntity>> {
     let mut grouped = BTreeMap::<String, Vec<&ExtractedEntity>>::new();
     for entity in extraction
         .entities
         .iter()
-        .filter(|entity| entity.kind == kind)
+        .filter(|entity| entity.kind == EntityKind::Decision)
     {
-        if let Some(identifier) = &entity.id {
-            grouped.entry(identifier.clone()).or_default().push(entity);
-        }
+        let key = entity
+            .id
+            .clone()
+            .unwrap_or_else(|| format!("@{}:{}", entity.evidence.artifact, entity.evidence.line));
+        grouped.entry(key).or_default().push(entity);
     }
     grouped
 }

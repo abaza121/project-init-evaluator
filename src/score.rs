@@ -336,14 +336,14 @@ fn score_evidence_quality(
     metrics: &DeterministicMetrics,
 ) -> DimensionScore {
     let research = research_decisions(extraction);
-    if research.is_empty() {
-        return dimension(15.0, 15, Vec::new());
-    }
     let evidence = extraction
         .entities
         .iter()
         .filter(|entity| entity.kind == EntityKind::EvidenceClaim)
         .collect::<Vec<_>>();
+    if research.is_empty() && evidence.is_empty() {
+        return dimension(15.0, 15, Vec::new());
+    }
     let linkage = metrics.evidence_linkage_rate.unwrap_or(0.0) / 100.0;
     let mut findings = evidence_misuse_findings(extraction);
     let misuse_penalty = findings.len() as f64 * 3.0;
@@ -377,7 +377,11 @@ fn score_evidence_quality(
             Some("DecorativeResearch"),
         ));
     }
-    let targeting = if evidence.is_empty() { 0.0 } else { 4.0 };
+    let targeting = if research.is_empty() || evidence.is_empty() {
+        0.0
+    } else {
+        4.0
+    };
     let citation_quality = if evidence.iter().any(|claim| {
         claim.text.contains("http://") || claim.text.contains("https://") || claim.id.is_some()
     }) {
@@ -849,35 +853,42 @@ fn trace_touches(extraction: &Extraction, identifier: &str) -> bool {
 
 /// Returns one representative entity for every identified unsupported decision.
 fn unsupported_entities(extraction: &Extraction) -> Vec<&ExtractedEntity> {
-    let mut representatives = BTreeMap::<&str, &ExtractedEntity>::new();
+    let mut representatives = BTreeMap::<String, &ExtractedEntity>::new();
     for entity in extraction
         .entities
         .iter()
         .filter(|entity| entity.kind == EntityKind::Decision)
     {
-        if let Some(identifier) = entity.id.as_deref()
-            && !decision_has_provenance(entity, extraction, identifier)
-        {
-            representatives.entry(identifier).or_insert(entity);
+        if !decision_has_provenance(entity, extraction) {
+            let key = entity.id.clone().unwrap_or_else(|| {
+                format!("@{}:{}", entity.evidence.artifact, entity.evidence.line)
+            });
+            representatives.entry(key).or_insert(entity);
         }
     }
     representatives.into_values().collect()
 }
 
 /// Checks explicit IDs and validated traces for accepted decision provenance.
-fn decision_has_provenance(
-    entity: &ExtractedEntity,
-    extraction: &Extraction,
-    identifier: &str,
-) -> bool {
-    entity.related_ids.iter().any(|related| {
-        ["REQ-", "ANS-", "ASM-", "CON-", "CST-", "EVD-", "SRC-"]
+fn decision_has_provenance(entity: &ExtractedEntity, extraction: &Extraction) -> bool {
+    entity.evidence.artifact == "ORIGINAL_BRIEF"
+        || entity
+            .related_ids
             .iter()
-            .any(|prefix| related.starts_with(prefix))
-    }) || extraction
-        .traces
+            .any(|related| is_score_provenance_id(related))
+        || entity.id.as_ref().is_some_and(|identifier| {
+            extraction.traces.iter().any(|trace| {
+                (trace.from_id == *identifier && is_score_provenance_id(&trace.to_id))
+                    || (trace.to_id == *identifier && is_score_provenance_id(&trace.from_id))
+            })
+        })
+}
+
+/// Recognizes trace endpoints accepted as explicit decision provenance.
+fn is_score_provenance_id(identifier: &str) -> bool {
+    ["REQ-", "ANS-", "ASM-", "CON-", "CST-", "EVD-", "SRC-"]
         .iter()
-        .any(|trace| trace.from_id == identifier || trace.to_id == identifier)
+        .any(|prefix| identifier.starts_with(prefix))
 }
 
 /// Detects high-impact project choices used in assumption-promotion checks.
