@@ -358,11 +358,34 @@ fn write_comparison_report(output_dir: &Path, markdown: &str) -> Result<(), Eval
         ".comparison-report.md.{}.{id}.tmp",
         std::process::id()
     ));
+    let backup_path = output_dir.join(format!(
+        ".comparison-report.md.{}.{id}.bak",
+        std::process::id()
+    ));
     fs::write(&temp_path, markdown).map_err(|source| io_error(&temp_path, source))?;
-    if final_path.exists() {
-        fs::remove_file(&final_path).map_err(|source| io_error(&final_path, source))?;
+    replace_comparison_report(&temp_path, &final_path, &backup_path)
+}
+
+/// Promotes one staged comparison and restores the previous report after failure.
+fn replace_comparison_report(
+    temp_path: &Path,
+    final_path: &Path,
+    backup_path: &Path,
+) -> Result<(), EvaluatorError> {
+    let had_previous = final_path.exists();
+    if had_previous {
+        fs::rename(final_path, backup_path).map_err(|source| io_error(final_path, source))?;
     }
-    fs::rename(&temp_path, &final_path).map_err(|source| io_error(&final_path, source))
+    if let Err(source) = fs::rename(temp_path, final_path) {
+        if had_previous && let Err(restore_error) = fs::rename(backup_path, final_path) {
+            return Err(io_error(final_path, restore_error));
+        }
+        return Err(io_error(final_path, source));
+    }
+    if had_previous {
+        fs::remove_file(backup_path).map_err(|source| io_error(backup_path, source))?;
+    }
+    Ok(())
 }
 
 /// Wraps one comparison-output filesystem failure with its exact path.
@@ -370,5 +393,62 @@ fn io_error(path: &Path, source: std::io::Error) -> EvaluatorError {
     EvaluatorError::Io {
         path: path.to_path_buf(),
         source,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::error::Error;
+    use std::fs;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    use super::replace_comparison_report;
+
+    static NEXT_ROLLBACK_ID: AtomicU64 = AtomicU64::new(0);
+
+    /// Owns one isolated comparison rollback fixture.
+    struct RollbackWorkspace {
+        root: PathBuf,
+    }
+
+    impl RollbackWorkspace {
+        /// Creates a unique workspace below the operating system temporary directory.
+        fn new() -> Result<Self, Box<dyn Error>> {
+            let id = NEXT_ROLLBACK_ID.fetch_add(1, Ordering::Relaxed);
+            let root = std::env::temp_dir().join(format!(
+                "project-initiation-comparison-rollback-{}-{id}",
+                std::process::id()
+            ));
+            fs::create_dir_all(&root)?;
+            Ok(Self { root })
+        }
+    }
+
+    impl Drop for RollbackWorkspace {
+        /// Removes only the uniquely named temporary workspace owned by this test.
+        fn drop(&mut self) {
+            if self.root.starts_with(std::env::temp_dir()) {
+                let _ = fs::remove_dir_all(&self.root);
+            }
+        }
+    }
+
+    /// Proves failed promotion restores the previous comparison report.
+    #[test]
+    fn comparison_replacement_restores_previous_report_after_failure() -> Result<(), Box<dyn Error>>
+    {
+        let workspace = RollbackWorkspace::new()?;
+        let final_path = workspace.root.join("comparison-report.md");
+        let missing_temp = workspace.root.join("missing.tmp");
+        let backup = workspace.root.join("comparison-report.bak");
+        fs::write(&final_path, "previous report")?;
+
+        let error = replace_comparison_report(&missing_temp, &final_path, &backup).unwrap_err();
+
+        assert!(error.to_string().contains("comparison-report.md"));
+        assert_eq!(fs::read_to_string(final_path)?, "previous report");
+        assert!(!backup.exists());
+        Ok(())
     }
 }

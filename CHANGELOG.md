@@ -21,3 +21,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Count unidentified decisions and decorative research conservatively instead of omitting them from evaluation.
 - Calculate experimental retrieval rates from supplied numerator and denominator telemetry when direct rates are unavailable.
 - Bound all discovered package entries and preflight file sizes before allocating artifact content.
+- Restore the previous comparison report when staged output promotion fails.
